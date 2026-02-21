@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { UploadCloud, FileText, Loader2 } from 'lucide-react';
-import { uploadPdfAction } from '@/app/actions/upload';
 
 interface UploadSectionProps {
   onUploadSuccess: (documentId: string, s3Url: string, text: string) => void;

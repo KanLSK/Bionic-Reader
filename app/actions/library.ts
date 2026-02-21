@@ -17,8 +17,9 @@ export async function getUserLibraryAction() {
 
     await dbConnect();
     
-    // Sort by uploadDate descending, populate tags
+    // Sort by uploadDate descending, populate tags, and exclude massive rawText field
     const docs = await PdfDocument.find({ userId })
+      .select('-rawText')
       .populate('tags')
       .sort({ uploadDate: -1 })
       .lean();
