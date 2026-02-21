@@ -24,3 +24,83 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* ─── react-pdf Text Layer Bionic Override ──────────────────────────────────
+   The text layer sits on top of the canvas. By default text is transparent.
+   We make it visible so customTextRenderer bionic HTML shows through.
+   White background on each span "paints over" the canvas text below,
+   while images/graphics on the canvas remain fully visible.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.react-pdf__Page__textContent {
+  /* remove the default selection highlight colour */
+  user-select: text;
+}
+
+.react-pdf__Page__textContent span {
+  /* Show the bionic text instead of the transparent canvas text */
+  color: rgba(0, 0, 0, 0.88) !important;
+  /* Paint over the original canvas text */
+  background-color: #ffffff;
+  /* Prevent sub-pixel gaps between spans */
+  border-radius: 0;
+  line-height: 1;
+}
+
+/* Dark mode – reverse the background */
+@media (prefers-color-scheme: dark) {
+  .react-pdf__Page__textContent span {
+    color: rgba(255, 255, 255, 0.9) !important;
+    background-color: #1c1c1e;
+  }
+}
+
+/* Active-word highlight — applied via DOM classList, not React re-render */
+.react-pdf__Page__textContent [data-word-index].bionic-active {
+  background-color: rgba(253, 224, 71, 0.88) !important;
+  border-radius: 3px;
+  padding: 0 1px;
+  color: rgba(0, 0, 0, 0.92) !important;
+}
+
+/* Keep <mark> working too (fallback) */
+.react-pdf__Page__textContent mark {
+  background-color: rgba(253, 224, 71, 0.88);
+  color: rgba(0, 0, 0, 0.9);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+/* Bold (bionic first half) must inherit colour so it's readable */
+.react-pdf__Page__textContent b,
+.react-pdf__Page__textContent strong {
+  color: inherit;
+  font-weight: 800;
+}
+
+/* ─── Sepia Theme ────────────────────────────────────────────────────────────
+   Applied via .sepia-mode class on <html> by ReaderContainer
+   ─────────────────────────────────────────────────────────────────────────── */
+.sepia-mode {
+  --background: #f5f0e8;
+  --foreground: #5c4a2a;
+}
+
+.sepia-mode body,
+.sepia-mode .bg-white,
+.sepia-mode .dark\:bg-zinc-950 {
+  background-color: #f5f0e8 !important;
+  color: #5c4a2a !important;
+}
+
+.sepia-mode .bg-zinc-50,
+.sepia-mode .bg-amber-50 {
+  background-color: #faf7f2 !important;
+}
+
+/* Sepia bionic text panel */
+.sepia-mode .react-pdf__Page__textContent span {
+  background-color: #f5f0e8;
+  color: rgba(92, 74, 42, 0.9) !important;
+}
+
