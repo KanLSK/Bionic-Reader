@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, RotateCcw, Check, ChevronRight, Brain, Loader2, Sparkles } from 'lucide-react';
+import { X, RotateCcw, Check, ChevronRight, Brain, Sparkles } from 'lucide-react';
 
 export interface Flashcard {
   id?: string;

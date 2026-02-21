@@ -132,11 +132,11 @@ export async function uploadPdfAction(formData: FormData) {
       success: true,
       documentId: savedDoc._id.toString(),
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in uploadPdfAction:', error);
     return {
       success: false,
-      error: error.message || 'Failed to upload and process PDF',
+      error: error instanceof Error ? error.message : 'Failed to upload and process PDF',
     };
   }
 }
@@ -157,11 +157,11 @@ export async function getPdfDocumentAction(id: string) {
       success: true,
       document: JSON.parse(JSON.stringify(doc)),
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching document:', error);
     return {
       success: false,
-      error: error.message || 'Failed to fetch document',
+      error: error instanceof Error ? error.message : 'Failed to fetch document',
     };
   }
 }

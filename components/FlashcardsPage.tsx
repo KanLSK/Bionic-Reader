@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import TopNav from './TopNav';
 import {
-  Brain, Play, TrendingUp, CheckCircle2, RotateCcw, Target,
+  Brain, Play, CheckCircle2, RotateCcw, Target,
   Search, Filter, Clock, X, Award,
   BookOpen, Sparkles, ChevronDown, Activity, AlertCircle
 } from 'lucide-react';

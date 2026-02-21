@@ -62,11 +62,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ cards });
-  } catch (err: any) {
-    console.error('Flashcard generation error:', err);
+  } catch (error: unknown) {
+    console.error('Flashcard generation error:', error);
     return NextResponse.json(
-      { error: err.message || 'Failed to generate flashcards' },
-      { status: 500 },
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
     );
   }
 }

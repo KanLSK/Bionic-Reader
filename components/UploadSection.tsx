@@ -28,8 +28,12 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
       const formData = new FormData();
       formData.append('file', file);
 
-      // Using the Server Action
-      const result = await uploadPdfAction(formData);
+      // Using the Server Action Route
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await uploadRes.json();
 
       if (result.success && result.documentId) {
         // Fetch the parsed document from server to get text
@@ -37,7 +41,7 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
         const res = await fetch(`/api/document?id=${result.documentId}`);
         const data = await res.json();
         
-        if (data.success) {
+        if (data.success && data.document) {
           onUploadSuccess(result.documentId, data.document.s3Url, data.document.rawText);
         } else {
           setError(data.error || 'Failed to retrieve parsed document.');
@@ -45,8 +49,52 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
       } else {
         setError(result.error || 'Failed to upload document.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    
+    if (file.type !== 'application/pdf') {
+      setError('Please upload a valid PDF document.');
+      return;
+    }
+
+    setIsUploading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Using the Server Action Route
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await uploadRes.json();
+
+      if (result.success && result.documentId) {
+        const res = await fetch(`/api/document?id=${result.documentId}`);
+        const data = await res.json();
+        
+        if (data.success && data.document) {
+          onUploadSuccess(result.documentId, data.document.s3Url, data.document.rawText);
+        } else {
+          setError(data.error || 'Failed to retrieve parsed document.');
+        }
+      } else {
+        setError(result.error || 'Failed to upload document.');
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
     } finally {
       setIsUploading(false);
     }
@@ -58,12 +106,16 @@ export default function UploadSection({ onUploadSuccess }: UploadSectionProps) {
         <FileText className="w-12 h-12 text-blue-500 dark:text-blue-400" />
       </div>
       
-      <h2 className="text-2xl font-bold mb-2 text-zinc-800 dark:text-zinc-100 font-sans tracking-tight">Upload your PDF</h2>
+      <h2 className="2xl font-bold mb-2 text-zinc-800 dark:text-zinc-100 font-sans tracking-tight">Upload your PDF</h2>
       <p className="text-zinc-500 dark:text-zinc-400 mb-8 text-center max-w-md">
-        We'll extract the text and convert it to Bionic format to supercharge your reading speed.
+        We&apos;ll extract the text and convert it to Bionic format to supercharge your reading speed.
       </p>
 
-      <div className="relative group cursor-pointer">
+      <div 
+        className="relative group cursor-pointer"
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onDrop={handleDrop}
+      >
         <input
           type="file"
           accept="application/pdf"

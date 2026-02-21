@@ -161,7 +161,7 @@ export default function BionicText({
             data-index={idx}
             data-para={para}
             onClick={() => onWordClick(idx)}
-            className={`bionic-word focus-mode-word cursor-pointer inline-block whitespace-nowrap mx-[0.1em] rounded-md transition-all duration-150 ${isHeader ? 'header-word' : ''}`}
+            className={`bionic-word focus-mode-word cursor-pointer inline-block whitespace-nowrap mx-[0.1em] px-1 rounded-md transition-all duration-150 ${isHeader ? 'header-word' : ''}`}
           >
             {prefix}
             <strong className="bionic-core font-black tracking-tight">
@@ -214,8 +214,6 @@ export default function BionicText({
         background: rgba(99,102,241,0.18);
         box-shadow: 0 0 12px rgba(99,102,241,0.35);
         border-radius: 5px;
-        padding: 1px 4px;
-        transform: scale(1.04);
       }
       .focus-mode-word.bionic-word-active .bionic-core { color: #a5b4fc; }
       .focus-mode-word.bionic-word-active .bionic-rest { color: #c7d2fe; }
@@ -234,7 +232,6 @@ export default function BionicText({
         background-color: rgb(254 240 138); 
         box-shadow: 0 0 0 2px rgb(250 204 21);
         border-radius: 5px;
-        transform: scale(1.05);
         z-index: 10;
         position: relative;
       }

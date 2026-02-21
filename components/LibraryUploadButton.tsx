@@ -32,10 +32,11 @@ export default function LibraryUploadButton() {
         router.push(`/reader/${result.documentId}`);
       } else {
         setError(result.error || 'Upload failed. Please try again.');
-        setIsUploading(false);
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+    } catch (error: unknown) {
+      console.error('Upload error:', error);
+      setError(error instanceof Error ? error.message : 'Upload failed. Please try again.');
+    } finally {
       setIsUploading(false);
     }
   };

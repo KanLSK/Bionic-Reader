@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { SignedIn, SignedOut, SignUpButton, SignInButton, UserButton } from '@clerk/nextjs';
 import {
-  Zap, Brain, BarChart2, CheckCircle2, Lock,
+  Zap, Brain, CheckCircle2, Lock,
   ChevronRight, Flame, Play, ArrowRight, Sparkles,
 } from 'lucide-react';
 

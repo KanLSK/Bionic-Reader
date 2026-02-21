@@ -148,12 +148,13 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
   // Active Project Stats
   const apProgressAvg = projectDocs.length ? Math.round(projectDocs.reduce((acc, d) => acc + calculateProgress(d), 0) / projectDocs.length) : 0;
 
-  // Initialize edit name when heroDoc changes
-  useEffect(() => {
+  // Initialize edit name when opening the edit input
+  const handleEditClick = () => {
     if (heroDoc) {
       setEditHeroName(heroDoc.filename.replace(/\.pdf$/i, '').trim());
+      setIsEditingHero(true);
     }
-  }, [heroDoc]);
+  };
 
   // Animate progress bar on mount
   useEffect(() => {
@@ -298,11 +299,11 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
                       >
                         {heroDoc.filename.replace(/\.pdf$/i, '').trim()}
                       </h2>
-                      <button 
-                        onClick={() => setIsEditingHero(true)}
-                        className="opacity-0 group-hover/edit:opacity-100 p-1 text-zinc-500 hover:text-white transition-all"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
+                      <button
+                    onClick={handleEditClick}
+                    className="p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] text-zinc-500 hover:text-indigo-400 transition-all opacity-0 group-hover:opacity-100 mt-1"
+                    title="Rename document"
+                  >      <Edit2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   )}

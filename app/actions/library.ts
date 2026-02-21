@@ -27,11 +27,11 @@ export async function getUserLibraryAction() {
       success: true,
       documents: JSON.parse(JSON.stringify(docs)),
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching user library:', error);
     return {
       success: false,
-      error: error.message || 'Failed to fetch library',
+      error: error instanceof Error ? error.message : 'Failed to fetch library',
       documents: []
     };
   }
@@ -72,9 +72,9 @@ export async function deleteDocumentAction(documentId: string) {
     await PdfDocument.deleteOne({ _id: documentId, userId });
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting document:', error);
-    return { success: false, error: error.message || 'Failed to delete document' };
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to delete document' };
   }
 }
 
@@ -99,9 +99,9 @@ export async function updateDocumentProgressAction(documentId: string, currentWo
     if (!doc) throw new Error('Document not found or unauthorized');
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating document progress:', error);
-    return { success: false, error: error.message || 'Failed to update progress' };
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to update progress' };
   }
 }
 
@@ -115,19 +115,19 @@ export async function updateDocumentMetadataAction(
 
     await dbConnect();
 
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (data.projectId !== undefined) {
       if (data.projectId === null) updateData.$unset = { projectId: 1 };
-      else updateData.$set = { ...updateData.$set, projectId: data.projectId };
+      else updateData.$set = { ...(updateData.$set as Record<string, unknown> || {}), projectId: data.projectId };
     }
     if (data.tags !== undefined) {
-      updateData.$set = { ...updateData.$set, tags: data.tags };
+      updateData.$set = { ...(updateData.$set as Record<string, unknown> || {}), tags: data.tags };
     }
     if (data.status !== undefined) {
-      updateData.$set = { ...updateData.$set, status: data.status };
+      updateData.$set = { ...(updateData.$set as Record<string, unknown> || {}), status: data.status };
     }
     if (data.filename !== undefined) {
-      updateData.$set = { ...updateData.$set, filename: data.filename };
+      updateData.$set = { ...(updateData.$set as Record<string, unknown> || {}), filename: data.filename };
     }
 
     const doc = await PdfDocument.findOneAndUpdate(
@@ -139,8 +139,11 @@ export async function updateDocumentMetadataAction(
     if (!doc) throw new Error('Document not found or unauthorized');
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating document metadata:', error);
-    return { success: false, error: error.message || 'Failed to update metadata' };
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update document metadata',
+    };
   }
 }

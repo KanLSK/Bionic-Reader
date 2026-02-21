@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result);
     }
     return NextResponse.json(result, { status: 400 });
-  } catch (err: any) {
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : 'Upload failed' }, { status: 500 });
   }
 }

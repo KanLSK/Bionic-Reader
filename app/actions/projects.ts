@@ -13,9 +13,9 @@ export async function createProjectAction(name: string, color?: string) {
     await dbConnect();
     const project = await Project.create({ name, userId, color });
     return { success: true, project: JSON.parse(JSON.stringify(project)) };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating project:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -29,15 +29,19 @@ export async function getUserProjectsAction() {
     // Aggregate to get simple document counts. Full document fetching handles complex stats.
     const projects = await Project.find({ userId }).sort({ createdAt: 1 }).lean();
     
-    const projectsWithCounts = await Promise.all(projects.map(async (p: any) => {
+    const projectsWithCounts = await Promise.all(projects.map(async (p) => {
       const docCount = await PdfDocument.countDocuments({ projectId: p._id, userId });
       return { ...p, documentCount: docCount };
     }));
 
     return { success: true, projects: JSON.parse(JSON.stringify(projectsWithCounts)) };
-  } catch (error: any) {
-    console.error('Error fetching projects:', error);
-    return { success: false, error: error.message, projects: [] };
+  } catch (error: unknown) {
+    console.error('Error fetching dashboard projects summary:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to fetch summary',
+      projects: []
+    };
   }
 }
 
@@ -49,9 +53,9 @@ export async function renameProjectAction(projectId: string, name: string) {
     await dbConnect();
     await Project.updateOne({ _id: projectId, userId }, { name });
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error renaming project:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }
 
@@ -66,8 +70,8 @@ export async function deleteProjectAction(projectId: string) {
     await Project.deleteOne({ _id: projectId, userId });
     
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting project:', error);
-    return { success: false, error: error.message };
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

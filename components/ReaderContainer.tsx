@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import BionicText from './BionicText';
 import FlashcardModal, { type Flashcard } from './FlashcardModal';
 import { saveFlashcardsAction } from '@/app/actions/flashcards';
 import {
-  Columns2, BookOpen, ArrowLeft, Zap,
-  Play, Pause, RotateCcw, Plus, Minus, Clock,
+  Columns2, BookOpen, ArrowLeft, Zap, ListTree, ChevronLeft, ChevronRight,
+  Play, Pause, RotateCcw, Plus, Minus, Clock, CheckCircle2
 } from 'lucide-react';
 import { updateDocumentProgressAction } from '@/app/actions/library';
+import { chunkText, type TextChunk } from '@/lib/chunking';
 
 const BionicPdfViewer = dynamic(() => import('./OriginalPdfViewer'), {
   ssr: false,
@@ -39,6 +40,17 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
   const [currentWordIndex, setCurrentWordIndex] = useState(initialWordIndex);
   const [viewMode, setViewMode]     = useState<ViewMode>('focus');
   const [uiVisible, setUiVisible]   = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Chunking logic
+  const chunks = useMemo(() => chunkText(rawText), [rawText]);
+  const currentChunkIndex = useMemo(() => {
+    return chunks.findIndex((c: TextChunk) => currentWordIndex >= c.startIndex && currentWordIndex < c.endIndex) >= 0
+      ? chunks.findIndex((c: TextChunk) => currentWordIndex >= c.startIndex && currentWordIndex < c.endIndex)
+      : 0;
+  }, [chunks, currentWordIndex]);
+  const currentChunk = chunks[currentChunkIndex] || chunks[0];
+  const localWordIndex = currentWordIndex - currentChunk.startIndex;
 
   // Flashcard state
   const [modalOpen, setModalOpen]         = useState(false);
@@ -123,8 +135,8 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
         setFlashcards(data.cards);
         saveFlashcardsAction(documentId, checkpoint, data.cards).catch(console.error);
       }
-    } catch (err: any) {
-      setFcError(err.message || 'Network error');
+    } catch (err: unknown) {
+      setFcError(err instanceof Error ? err.message : 'Network error');
     } finally {
       setFcLoading(false);
     }
@@ -158,8 +170,8 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
         setFlashcards(data.cards);
         saveFlashcardsAction(documentId, checkpoint, data.cards).catch(console.error);
       }
-    } catch (err: any) {
-      setFcError(err.message || 'Network error');
+    } catch (err: unknown) {
+      setFcError(err instanceof Error ? err.message : 'Network error');
     } finally {
       setFcLoading(false);
     }
@@ -201,20 +213,26 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
   const bumpWpm = (delta: number) =>
     setWpm((w) => Math.min(1000, Math.max(50, w + delta)));
 
-  const handleWordClick = useCallback((idx: number) => {
+  const handleWordClick = useCallback((localIdx: number) => {
     setIsPlaying(false);
-    setCurrentWordIndex(idx);
-  }, []);
+    setCurrentWordIndex(currentChunk.startIndex + localIdx);
+  }, [currentChunk]);
 
   const handleModalClose = () => {
     setModalOpen(false);
     setTimeout(() => setIsPlaying(true), 300);
   };
 
+  const jumpToChunk = (chunkIndex: number) => {
+    setIsPlaying(false);
+    setCurrentWordIndex(chunks[chunkIndex].startIndex);
+    if (window.innerWidth < 1024) setSidebarOpen(false); // Close on mobile
+  };
+
   // ── Current paragraph detection (for glow) ───────────────────────────────
   // words per "paragraph chunk" for visual highlight grouping
   const PARA_CHUNK = 80;
-  const currentPara = Math.floor(currentWordIndex / PARA_CHUNK);
+  const currentPara = Math.floor(localWordIndex / PARA_CHUNK);
 
   return (
     <div
@@ -281,9 +299,15 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
           <div className="w-px h-4 bg-white/10 flex-shrink-0" />
 
-          <span className="text-xs font-semibold text-zinc-300 truncate max-w-[200px] hidden md:block" title={documentTitle}>
-            {documentTitle}
-          </span>
+          <button
+            onClick={() => setSidebarOpen(prev => !prev)}
+            className="flex items-center gap-2 p-1.5 -ml-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <ListTree className="w-4 h-4" />
+            <span className="text-xs font-semibold truncate max-w-[150px] md:max-w-[200px]" title={documentTitle}>
+              {documentTitle}
+            </span>
+          </button>
 
           {/* Center: progress bar */}
           <div className="flex-1 flex flex-col gap-1 px-4">
@@ -369,8 +393,73 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
         </div>
       </div>
 
-      {/* ── MAIN READING AREA ──────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 relative overflow-hidden">
+      {/* ── MAIN LAYOUT (Sidebar + Content) ───────────────────────────────── */}
+      <div className="flex-1 min-h-0 relative flex overflow-hidden">
+        
+        {/* Sidebar Overlay (Mobile) */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-40 lg:hidden" 
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* ── CHUNK SIDEBAR ─────────────────────────────────────────────── */}
+        <div 
+          className={`absolute lg:relative flex-shrink-0 h-full bg-[#0a0d14] border-r border-white/5 transition-all duration-300 z-50 flex flex-col ${
+            sidebarOpen ? 'w-72 translate-x-0' : 'w-0 -translate-x-full lg:translate-x-0 lg:w-0 border-transparent'
+          }`}
+          style={{ overflow: sidebarOpen ? 'visible' : 'hidden' }}
+        >
+          {sidebarOpen && (
+             <div className="flex flex-col h-full w-72">
+               <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                 <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Chapters</h3>
+                 <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-zinc-500 hover:text-white">
+                   <ArrowLeft className="w-4 h-4" />
+                 </button>
+               </div>
+               <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                 {chunks.map((chunk: TextChunk, idx: number) => {
+                   const isPast = currentWordIndex >= chunk.endIndex;
+                   const isActive = idx === currentChunkIndex;
+                   return (
+                     <button
+                       key={chunk.id}
+                       onClick={() => jumpToChunk(idx)}
+                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+                         isActive 
+                           ? 'bg-blue-600/10 text-blue-400' 
+                           : 'hover:bg-white/5 text-zinc-400 hover:text-zinc-200'
+                       }`}
+                     >
+                       <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+                         {isPast ? (
+                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/50" />
+                         ) : isActive ? (
+                           <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+                         ) : (
+                           <div className="w-1 h-1 rounded-full bg-zinc-700" />
+                         )}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <div className={`text-sm font-medium truncate ${isActive ? 'text-blue-300 font-bold' : ''}`}>
+                           {chunk.title}
+                         </div>
+                         <div className="text-[10px] text-zinc-600">
+                           {Math.round(chunk.text.split(' ').length / wpm)} min read
+                         </div>
+                       </div>
+                     </button>
+                   );
+                 })}
+               </div>
+             </div>
+          )}
+        </div>
+
+        {/* ── MAIN READING AREA ──────────────────────────────────────────────── */}
+        <div className="flex-1 min-w-0 min-h-0 relative overflow-hidden flex flex-col">
 
         {viewMode === 'focus' ? (
           /* ─── FOCUS MODE ─────────────────────────────────────────────── */
@@ -380,14 +469,34 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
             {/* Reading column */}
             <div className="relative z-10 max-w-[760px] mx-auto px-4 sm:px-8 py-8 sm:py-12 pb-32">
+              <div className="mb-8 text-center">
+                <span className="px-3 py-1 rounded-full bg-white/5 border border-white/5 text-xs font-bold text-zinc-500 tracking-widest uppercase">
+                  {currentChunk.title}
+                </span>
+              </div>
               <BionicText
-                text={rawText}
-                currentWordIndex={currentWordIndex}
+                text={currentChunk.text}
+                currentWordIndex={localWordIndex}
                 onWordClick={handleWordClick}
                 focusMode
                 currentPara={currentPara}
                 wordsPerPara={PARA_CHUNK}
               />
+              
+              {/* Next/Prev Chunk Controls */}
+              <div className="mt-16 pt-8 border-t border-white/5 flex items-center justify-between">
+                {currentChunkIndex > 0 ? (
+                  <button onClick={() => jumpToChunk(currentChunkIndex - 1)} className="flex items-center gap-2 text-zinc-500 hover:text-zinc-300 text-sm font-medium transition-colors">
+                    <ChevronLeft className="w-4 h-4" /> Previous Section
+                  </button>
+                ) : <div />}
+                
+                {currentChunkIndex < chunks.length - 1 && (
+                  <button onClick={() => jumpToChunk(currentChunkIndex + 1)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 text-sm font-bold transition-all">
+                    Next Section <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -416,9 +525,14 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
               className="w-1/2 h-full overflow-y-auto px-4 sm:px-8 py-8 sm:py-12 pb-32"
               style={{ background: '#090C12' }}
             >
+              <div className="mb-6">
+                <span className="text-[10px] font-bold text-zinc-600 tracking-widest uppercase">
+                  {currentChunk.title}
+                </span>
+              </div>
               <BionicText
-                text={rawText}
-                currentWordIndex={currentWordIndex}
+                text={currentChunk.text}
+                currentWordIndex={localWordIndex}
                 onWordClick={handleWordClick}
                 focusMode
                 currentPara={currentPara}
@@ -427,6 +541,7 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* ── FLOATING CONTROL CAPSULE ────────────────────────────────────────── */}

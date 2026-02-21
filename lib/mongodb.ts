@@ -14,11 +14,11 @@ if (!MONGODB_URI) {
  * during API Route usage.
  */
 
-// @ts-ignore
+// @ts-expect-error: Global scope modification
 let cached = global.mongoose;
 
 if (!cached) {
-  // @ts-ignore
+  // @ts-expect-error: Global scope modification
   cached = global.mongoose = { conn: null, promise: null };
 }
 
