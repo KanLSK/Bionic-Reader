@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     // Trim to ~3000 words to stay within token limits
     const trimmed = text.split(/\s+/).slice(0, 3000).join(' ');
 
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const result = await model.generateContent(
       `${SYSTEM_PROMPT}\n\nText:\n${trimmed}`,

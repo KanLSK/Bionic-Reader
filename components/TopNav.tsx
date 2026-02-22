@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Zap } from 'lucide-react';
+import { Zap, Settings } from 'lucide-react';
 
 export const NAV_LINKS = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -47,9 +47,14 @@ export default function TopNav({ activePage, user }: TopNavProps) {
           })}
         </div>
 
-        {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xs font-extrabold text-white shadow-md shrink-0">
-          {(user?.firstName?.[0] ?? 'U').toUpperCase()}
+        {/* Actions & Avatar */}
+        <div className="flex items-center gap-4">
+          <Link href="/settings" className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/[0.05] transition-colors" title="Settings">
+            <Settings className="w-4 h-4" />
+          </Link>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-xs font-extrabold text-white shadow-md shrink-0">
+            {(user?.firstName?.[0] ?? 'U').toUpperCase()}
+          </div>
         </div>
       </div>
     </nav>
