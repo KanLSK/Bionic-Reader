@@ -8,6 +8,7 @@ export interface IReadingSession extends Document {
   wordsRead: number;
   wpm: number;
   regressions: number;
+  pauses: number;
 }
 
 const ReadingSessionSchema: Schema = new Schema({
@@ -18,6 +19,7 @@ const ReadingSessionSchema: Schema = new Schema({
   wordsRead: { type: Number, required: true },
   wpm: { type: Number, required: true },
   regressions: { type: Number, default: 0 },
+  pauses: { type: Number, default: 0 },
 });
 
 const ReadingSession: Model<IReadingSession> =

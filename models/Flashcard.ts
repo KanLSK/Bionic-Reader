@@ -6,6 +6,14 @@ export interface IFlashcard extends Document {
   checkpoint: number;       // 15 | 30 | 45 | 60 | 75 | 90
   question: string;
   answer: string;
+  
+  // Context-Aware fields
+  sectionReference?: string;
+  topicTag?: string;
+  conceptClusterId?: string; // ObjectId string
+  sectionComplexityScore?: number;
+  initialDifficultyModifier?: number;
+
   gotItCount: number;
   reviewCount: number;
   
@@ -26,6 +34,13 @@ const FlashcardSchema: Schema = new Schema({
   checkpoint: { type: Number, required: true },
   question:   { type: String, required: true },
   answer:     { type: String, required: true },
+  
+  sectionReference: { type: String },
+  topicTag:         { type: String },
+  conceptClusterId: { type: String, index: true },
+  sectionComplexityScore: { type: Number },
+  initialDifficultyModifier: { type: Number },
+
   gotItCount: { type: Number, default: 0 },
   reviewCount:{ type: Number, default: 0 },
   

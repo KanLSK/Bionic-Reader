@@ -306,17 +306,23 @@ export default function FlashcardsPage({ user }: FlashcardsPageProps) {
           <div className="hidden lg:flex items-center gap-8">
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Due</span>
-              <span className="text-sm font-bold text-indigo-400">{loading ? '-' : totalCardsDue} cards</span>
+              <span className="text-sm font-bold flex mt-0.5 min-h-[20px] items-center">
+                {loading ? <div className="w-12 h-4 bg-white/10 animate-pulse rounded" /> : <span className="text-indigo-400">{totalCardsDue} cards</span>}
+              </span>
             </div>
             <div className="w-px h-6 bg-white/[0.05]" />
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Weak Area</span>
-              <span className="text-sm font-bold text-rose-400">{loading ? '-' : totalWeak} cards</span>
+              <span className="text-sm font-bold flex mt-0.5 min-h-[20px] items-center">
+                {loading ? <div className="w-12 h-4 bg-white/10 animate-pulse rounded" /> : <span className="text-rose-400">{totalWeak} cards</span>}
+              </span>
             </div>
             <div className="w-px h-6 bg-white/[0.05]" />
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Est. Time</span>
-              <span className="text-sm font-bold text-zinc-300">~{loading ? '-' : Math.max(1, Math.round(totalCardsDue * 0.4))} min</span>
+              <span className="text-sm font-bold flex mt-0.5 min-h-[20px] items-center">
+                {loading ? <div className="w-12 h-4 bg-white/10 animate-pulse rounded" /> : <span className="text-zinc-300">~{Math.max(1, Math.round(totalCardsDue * 0.4))} min</span>}
+              </span>
             </div>
           </div>
 
@@ -332,7 +338,38 @@ export default function FlashcardsPage({ user }: FlashcardsPageProps) {
 
       <main className="max-w-[1400px] mx-auto px-6 py-6 border-x border-white/[0.02] min-h-[calc(100vh-130px)] bg-[#0B0E16]">
         {loading ? (
-          <div className="h-64 flex items-center justify-center text-zinc-500 text-sm font-medium">Fetching active queue...</div>
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8 mt-4">
+            <div className="space-y-8 min-w-0">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-4 h-4 rounded-full bg-white/10 animate-pulse" />
+                  <div className="h-4 w-32 bg-white/10 rounded animate-pulse" />
+                </div>
+                <div className="rounded-xl border border-white/[0.05] bg-[#0A0D15] p-5 min-h-[200px] flex flex-col gap-4">
+                  <div className="h-6 w-full bg-white/5 rounded animate-pulse" />
+                  <div className="h-10 w-full bg-white/[0.03] rounded animate-pulse" />
+                  <div className="h-10 w-full bg-white/[0.03] rounded animate-pulse" />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-4 h-4 rounded-full bg-white/10 animate-pulse" />
+                  <div className="h-4 w-40 bg-white/10 rounded animate-pulse" />
+                </div>
+                <div className="flex flex-col gap-3">
+                  <div className="h-20 w-full bg-white/[0.03] rounded-xl animate-pulse" />
+                  <div className="h-20 w-full bg-white/[0.03] rounded-xl animate-pulse" />
+                </div>
+              </div>
+            </div>
+            <div className="w-full">
+               <div className="flex items-center gap-2 mb-3">
+                  <div className="w-4 h-4 rounded-full bg-white/10 animate-pulse" />
+                  <div className="h-4 w-24 bg-white/10 rounded animate-pulse" />
+               </div>
+               <div className="h-[400px] bg-[#0A0D15] rounded-xl border border-white/[0.05] animate-pulse" />
+            </div>
+          </div>
         ) : queue.length === 0 ? (
            <div className="h-64 flex flex-col items-center justify-center text-center">
              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-4">

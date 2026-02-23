@@ -1,0 +1,30 @@
+
+> temp-app@0.1.0 lint
+> eslint
+
+
+/Users/kanhalder/1. Projects/Bionic Speed Reader/app/actions/analytics.ts
+   47:7   warning  'masteredCards' is assigned a value but never used        @typescript-eslint/no-unused-vars
+   71:27  error    Unexpected any. Specify a different type                  @typescript-eslint/no-explicit-any
+  179:7   error    'totalSessions' is never reassigned. Use 'const' instead  prefer-const
+  188:7   error    'uniqueDocs' is never reassigned. Use 'const' instead     prefer-const
+  415:7   error    'streakActive' is never reassigned. Use 'const' instead   prefer-const
+  415:7   warning  'streakActive' is assigned a value but never used         @typescript-eslint/no-unused-vars
+
+/Users/kanhalder/1. Projects/Bionic Speed Reader/components/AnalyticsPage.tsx
+    5:10   warning  'BarChart2' is defined but never used                                                                                                                                                                           @typescript-eslint/no-unused-vars
+    5:33   warning  'Zap' is defined but never used                                                                                                                                                                                 @typescript-eslint/no-unused-vars
+  158:10   warning  'MetricDial' is defined but never used                                                                                                                                                                          @typescript-eslint/no-unused-vars
+  158:140  error    Unexpected any. Specify a different type                                                                                                                                                                        @typescript-eslint/no-explicit-any
+  201:42   error    Unexpected any. Specify a different type                                                                                                                                                                        @typescript-eslint/no-explicit-any
+  236:9    warning  The 'currentSnapshot' logical expression could make the dependencies of useMemo Hook (at line 246) change on every render. To fix this, wrap the initialization of 'currentSnapshot' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/kanhalder/1. Projects/Bionic Speed Reader/components/ReaderContainer.tsx
+   65:54  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+   73:54  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+   74:28  error    Unexpected any. Specify a different type                                                                                                                                                                                                                                         @typescript-eslint/no-explicit-any
+  194:56  warning  The ref value 'sessionStartTime.current' will likely have changed by the time this effect cleanup function runs. If this ref points to a node rendered by React, copy 'sessionStartTime.current' to a variable inside the effect, and use that variable in the cleanup function  react-hooks/exhaustive-deps
+
+✖ 16 problems (9 errors, 7 warnings)
+  3 errors and 0 warnings potentially fixable with the `--fix` option.
+

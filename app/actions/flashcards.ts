@@ -3,12 +3,15 @@
 import dbConnect from '@/lib/mongodb';
 import Flashcard from '@/models/Flashcard';
 import PdfDocument from '@/models/PdfDocument';
+import ConceptCluster from '@/models/ConceptCluster';
 import UserSetting from '@/models/UserSetting';
 import { auth } from '@clerk/nextjs/server';
 
 export interface FlashcardData {
   question: string;
   answer: string;
+  topicTag?: string;
+  sectionComplexityScore?: number;
 }
 
 // Basic Jaccard Similarity for duplicate prevention
@@ -46,12 +49,43 @@ export async function saveFlashcardsAction(
     }
     
     if (!isDuplicate) {
+      // 1. Resolve ConceptCluster ID
+      let clusterId = undefined;
+      let initialDiffMod = 1.0;
+
+      if (newCard.topicTag) {
+        // Find existing cluster or create one
+        let cluster = await ConceptCluster.findOne({ userId, name: newCard.topicTag });
+        if (!cluster) {
+          cluster = await ConceptCluster.create({
+            userId,
+            name: newCard.topicTag,
+            averageAccuracy: 0,
+            averageIntervalGrowth: 1,
+            failureRate: 0,
+            stabilityIndex: 0
+          });
+        }
+        clusterId = cluster._id.toString();
+
+        // Optional: Look at cluster stats to adjust initial difficulty
+        if (cluster.averageAccuracy > 0 && cluster.averageAccuracy < 0.6) {
+           initialDiffMod = 0.8; // harder, interval grows slower
+        } else if (cluster.averageAccuracy >= 0.8) {
+           initialDiffMod = 1.2; // easier, interval grows faster
+        }
+      }
+
       docsToInsert.push({
         documentId,
         userId,
         checkpoint,
         question: newCard.question,
         answer: newCard.answer,
+        topicTag: newCard.topicTag,
+        conceptClusterId: clusterId,
+        sectionComplexityScore: newCard.sectionComplexityScore,
+        initialDifficultyModifier: initialDiffMod,
       });
     }
   }
@@ -99,12 +133,29 @@ export async function recordFlashcardResponseAction(
 
   // SM-2 Logic
   // Quality: Again=0, Hard=3, Good=4, Easy=5
-  const qMap = { Again: 0, Hard: 3, Good: 4, Easy: 5 };
+  const qMap: Record<'Again' | 'Hard' | 'Good' | 'Easy', number> = { Again: 0, Hard: 3, Good: 4, Easy: 5 };
   const q = qMap[rating];
 
   let newInterval = 0;
   let newRepetitions = card.repetitionCount;
   let newEaseFactor = card.easeFactor || 2.5;
+
+  // Context-Aware Modifiers
+  const initialDiffMod = card.initialDifficultyModifier || 1.0;
+  let clusterWeight = 1.0;
+
+  if (card.conceptClusterId) {
+    const cluster = await ConceptCluster.findById(card.conceptClusterId).lean();
+    if (cluster) {
+      if (cluster.averageAccuracy > 0 && cluster.averageAccuracy < 0.6) {
+        clusterWeight = 0.8; // User historically weak: intervals grow slower
+      } else if (cluster.averageAccuracy >= 0.8) {
+        clusterWeight = 1.1; // User historically strong: intervals grow faster
+      }
+    }
+  }
+
+  const combinedContextMod = initialDiffMod * clusterWeight * intervalModifier;
 
   if (q < 3) { // Again
     newRepetitions = 0;
@@ -116,11 +167,11 @@ export async function recordFlashcardResponseAction(
       newInterval = 6;
     } else {
       if (rating === 'Hard') {
-        newInterval = Math.round(card.interval * hardMultiplier);
+        newInterval = Math.round(card.interval * hardMultiplier * combinedContextMod);
       } else if (rating === 'Easy') {
-        newInterval = Math.round(card.interval * newEaseFactor * easyMultiplier * intervalModifier);
+        newInterval = Math.round(card.interval * newEaseFactor * easyMultiplier * combinedContextMod);
       } else { // Good
-        newInterval = Math.round(card.interval * newEaseFactor * intervalModifier);
+        newInterval = Math.round(card.interval * newEaseFactor * combinedContextMod);
       }
     }
     newRepetitions += 1;

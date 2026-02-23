@@ -10,11 +10,18 @@ Requirements:
 - Avoid trivial details
 - Concise and clear
 - Suitable for medical students
+- Extract a 1-3 word \`topicTag\` representing the main concept cluster.
+- Assign a \`sectionComplexityScore\` from 1-10 evaluating the cognitive density of the text.
 - Return ONLY a valid JSON array, no markdown, no explanation
 
 Format:
 [
-  { "question": "...", "answer": "..." },
+  { 
+    "question": "...", 
+    "answer": "...",
+    "topicTag": "Neuroanatomy",
+    "sectionComplexityScore": 8
+  },
   ...
 ]`;
 
@@ -43,7 +50,7 @@ export async function POST(req: NextRequest) {
     // Strip potential markdown code fences
     const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/i, '').trim();
 
-    let cards: { question: string; answer: string }[];
+    let cards: { question: string; answer: string; topicTag?: string; sectionComplexityScore?: number }[];
     try {
       cards = JSON.parse(clean);
     } catch {

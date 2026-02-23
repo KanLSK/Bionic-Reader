@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import BionicText from './BionicText';
 import FlashcardModal, { type Flashcard } from './FlashcardModal';
-import { saveFlashcardsAction } from '@/app/actions/flashcards';
+import { saveFlashcardsAction, getFlashcardsForDocumentAction } from '@/app/actions/flashcards';
 import {
   Columns2, BookOpen, ArrowLeft, Zap, ListTree, ChevronLeft, ChevronRight,
   Play, Pause, RotateCcw, Plus, Minus, Clock, CheckCircle2
@@ -62,6 +62,79 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
   const triggeredCheckpoints              = useRef<Set<number>>(new Set());
   const segmentStartRef                   = useRef(0);
 
+  const [docFlashcards, setDocFlashcards] = useState<Array<{ checkpoint: number, accuracyHistory?: boolean[] }>>([]);
+
+  useEffect(() => {
+    if (documentId) {
+      getFlashcardsForDocumentAction(documentId).then(res => {
+        if (res.success) {
+          setDocFlashcards(res.flashcards);
+          // Auto-mark passed checkpoints based on saved cards
+          const cps = new Set(res.flashcards.map((c: { checkpoint: number }) => c.checkpoint));
+          cps.forEach((cp: unknown) => {
+             if (typeof cp === 'number') triggeredCheckpoints.current.add(cp);
+          });
+        }
+      });
+    }
+  }, [documentId]);
+
+  const masteryColorMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const cp of CHECKPOINTS) {
+      const cpCards = docFlashcards.filter(c => c.checkpoint === cp);
+      if (cpCards.length > 0) {
+        let totalHits = 0;
+        let correctHits = 0;
+        cpCards.forEach(c => {
+          if (c.accuracyHistory && c.accuracyHistory.length > 0) {
+            c.accuracyHistory.forEach((h: boolean) => {
+              totalHits++;
+              if (h) correctHits++;
+            });
+          }
+        });
+        if (totalHits > 0) {
+          const acc = correctHits / totalHits;
+          if (acc >= 0.8) map[cp] = '#34d399'; // Emerald
+          else if (acc >= 0.5) map[cp] = '#fbbf24'; // Amber
+          else map[cp] = '#f87171'; // Red
+        } else {
+           map[cp] = '#cbd5e1'; // Grey/Unseen
+        }
+      }
+    }
+    return map;
+  }, [docFlashcards]);
+
+  const weakestSectionData = useMemo(() => {
+    let weakestCp: number | null = null;
+    let lowestAcc = 1.0;
+    for (const cp of CHECKPOINTS) {
+      const cpCards = docFlashcards.filter(c => c.checkpoint === cp);
+      if (cpCards.length > 0) {
+        let totalHits = 0;
+        let correctHits = 0;
+        cpCards.forEach(c => {
+          if (c.accuracyHistory && c.accuracyHistory.length > 0) {
+            c.accuracyHistory.forEach((h: boolean) => {
+              totalHits++;
+              if (h) correctHits++;
+            });
+          }
+        });
+        if (totalHits > 0) {
+          const acc = correctHits / totalHits;
+          if (acc < 0.6 && acc < lowestAcc) { // threshold for "weak" is < 60%
+            lowestAcc = acc;
+            weakestCp = cp;
+          }
+        }
+      }
+    }
+    return { cp: weakestCp, acc: lowestAcc };
+  }, [docFlashcards]);
+
   const words    = useRef(rawText.split(/\s+/).filter(Boolean));
   const maxWords = words.current.length;
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,6 +143,7 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
   // Analytics tracking
   const sessionStartTime = useRef<number>(Date.now());
   const sessionRegressions = useRef<number>(0);
+  const sessionPauses = useRef<number>(0);
   const highestWordIndex = useRef<number>(initialWordIndex);
 
   const progress       = maxWords > 0 ? (currentWordIndex / maxWords) * 100 : 0;
@@ -115,9 +189,11 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
   // ── Analytics Session Flush ──────────────────────────────────────────────
   useEffect(() => {
+    const startTime = sessionStartTime.current;
+    
     return () => {
       // Upon unmount, log the session IF we read anything
-      const durationMs = Date.now() - sessionStartTime.current;
+      const durationMs = Date.now() - startTime;
       const wordsRead = Math.max(0, highestWordIndex.current - initialWordIndex);
       if (documentId && durationMs > 5000 && wordsRead > 10) {
         logReadingSessionAction({
@@ -125,7 +201,8 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
           durationMs,
           wordsRead,
           wpm,
-          regressions: sessionRegressions.current
+          regressions: sessionRegressions.current,
+          pauses: sessionPauses.current
         }).catch(console.error);
       }
     };
@@ -201,6 +278,18 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
     }
   }, [documentId, maxWords]);
 
+  // ── Manual Navigation ───────────────────────────────────────────────────
+
+  const jumpToWeakestCheckpoint = useCallback(() => {
+    if (weakestSectionData.cp) {
+      setIsPlaying(false);
+      sessionPauses.current += 1;
+      const targetWordIdx = Math.floor(((weakestSectionData.cp - 15) / 100) * maxWords); // Jump to the chunk containing the start of that checkpoint
+      const targetStartIdx = Math.max(0, targetWordIdx);
+      setCurrentWordIndex(targetStartIdx);
+    }
+  }, [weakestSectionData.cp, maxWords]);
+
   // ── Speed reader tick ─────────────────────────────────────────────────────
   const tick = useCallback(() => {
     setCurrentWordIndex((prev) => {
@@ -233,7 +322,10 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [isPlaying, wpm, tick]);
 
-  const togglePlay  = () => setIsPlaying((p) => !p);
+  const togglePlay  = () => setIsPlaying((p) => {
+    if (p) sessionPauses.current += 1; // Log explicit pause
+    return !p;
+  });
   const resetReader = () => {
     setIsPlaying(false);
     setCurrentWordIndex(0);
@@ -245,32 +337,74 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
   const handleWordClick = useCallback((localIdx: number) => {
     setIsPlaying(false);
+    sessionPauses.current += 1; // Log pause via word click
     const newIdx = currentChunk.startIndex + localIdx;
-    if (newIdx < currentWordIndex) {
-      sessionRegressions.current += 1; // Log regression!
-    }
-    setCurrentWordIndex(newIdx);
-  }, [currentChunk, currentWordIndex]);
+    setCurrentWordIndex(prev => {
+      if (newIdx < prev) {
+        sessionRegressions.current += 1; // Log regression!
+      }
+      return newIdx;
+    });
+  }, [currentChunk]);
 
   const handleModalClose = () => {
     setModalOpen(false);
     setTimeout(() => setIsPlaying(true), 300);
   };
 
-  const jumpToChunk = (chunkIndex: number) => {
+  const jumpToChunk = useCallback((chunkIndex: number) => {
     setIsPlaying(false);
+    sessionPauses.current += 1; // Log explicit pause
     const newIdx = chunks[chunkIndex].startIndex;
-    if (newIdx < currentWordIndex) {
-      sessionRegressions.current += 1; // Log regression!
-    }
-    setCurrentWordIndex(newIdx);
+    setCurrentWordIndex(prev => {
+      if (newIdx < prev) {
+        sessionRegressions.current += 1; // Log regression!
+      }
+      return newIdx;
+    });
     if (window.innerWidth < 1024) setSidebarOpen(false); // Close on mobile
-  };
+  }, [chunks]);
 
   // ── Current paragraph detection (for glow) ───────────────────────────────
   // words per "paragraph chunk" for visual highlight grouping
   const PARA_CHUNK = 80;
   const currentPara = Math.floor(localWordIndex / PARA_CHUNK);
+
+  const sidebarChunkElements = useMemo(() => {
+    return chunks.map((chunk: TextChunk, idx: number) => {
+      const isPast = idx < currentChunkIndex;
+      const isActive = idx === currentChunkIndex;
+      return (
+        <button
+          key={chunk.id}
+          onClick={() => jumpToChunk(idx)}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
+            isActive 
+              ? 'bg-blue-600/10 text-blue-400' 
+              : 'hover:bg-white/5 text-zinc-400 hover:text-zinc-200'
+          }`}
+        >
+          <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
+            {isPast ? (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/50" />
+            ) : isActive ? (
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
+            ) : (
+              <div className="w-1 h-1 rounded-full bg-zinc-700" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className={`text-sm font-medium truncate ${isActive ? 'text-blue-300 font-bold' : ''}`}>
+              {chunk.title}
+            </div>
+            <div className="text-[10px] text-zinc-600">
+              {Math.round(chunk.text.split(' ').length / wpm)} min read
+            </div>
+          </div>
+        </button>
+      );
+    });
+  }, [chunks, currentChunkIndex, wpm, jumpToChunk]);
 
   return (
     <div
@@ -335,14 +469,15 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
             <span className="text-xs font-medium hidden sm:block">Library</span>
           </Link>
 
-          <div className="w-px h-4 bg-white/10 flex-shrink-0" />
+          <div className="hidden sm:block w-px h-4 bg-white/10 flex-shrink-0" />
 
           <button
             onClick={() => setSidebarOpen(prev => !prev)}
             className="flex items-center gap-2 p-1.5 -ml-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+            title="Toggle Sidebar Chapters"
           >
             <ListTree className="w-4 h-4" />
-            <span className="text-xs font-semibold truncate max-w-[150px] md:max-w-[200px]" title={documentTitle}>
+            <span className="hidden sm:block text-xs font-semibold truncate max-w-[150px] md:max-w-[200px]" title={documentTitle}>
               {documentTitle}
             </span>
           </button>
@@ -380,12 +515,12 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
                       style={{
                         width:      4,
                         height:     10,
-                        background: triggered
+                        background: masteryColorMap[cp] || (triggered
                           ? '#818cf8'
                           : passed
                           ? 'rgba(99,102,241,0.6)'
-                          : 'rgba(255,255,255,0.18)',
-                        boxShadow: triggered ? '0 0 6px rgba(129,140,248,0.8)' : 'none',
+                          : 'rgba(255,255,255,0.18)'),
+                        boxShadow: masteryColorMap[cp] ? `0 0 6px ${masteryColorMap[cp]}80` : (triggered ? '0 0 6px rgba(129,140,248,0.8)' : 'none'),
                       }}
                     />
                   </button>
@@ -396,8 +531,20 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
           {/* Right controls */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Weak Section jump */}
+            {weakestSectionData.cp && (
+              <button
+                onClick={jumpToWeakestCheckpoint}
+                className="hidden md:flex items-center gap-1 bg-red-500/10 border border-red-500/20 text-red-400 hover:bg-red-500/20 px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all mr-1"
+                title={`Jump back to review Checkpoint ${CHECKPOINTS.indexOf(weakestSectionData.cp) + 1} (${weakestSectionData.cp}%) where recall was ${Math.round(weakestSectionData.acc * 100)}%`}
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Weak Section
+              </button>
+            )}
+
             {/* Performance badge */}
-            <div className="hidden lg:flex items-center gap-1.5 bg-blue-500/8 border border-blue-500/15 rounded-lg px-2.5 py-1.5 mr-1">
+            <div className="hidden md:flex items-center gap-1.5 bg-blue-500/8 border border-blue-500/15 rounded-lg px-2.5 py-1.5 mr-1">
               <Zap className="w-3 h-3 text-blue-400" />
               <span className="text-[11px] font-bold text-blue-400">{wpm} WPM</span>
             </div>
@@ -457,41 +604,9 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
                    <ArrowLeft className="w-4 h-4" />
                  </button>
                </div>
-               <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                 {chunks.map((chunk: TextChunk, idx: number) => {
-                   const isPast = currentWordIndex >= chunk.endIndex;
-                   const isActive = idx === currentChunkIndex;
-                   return (
-                     <button
-                       key={chunk.id}
-                       onClick={() => jumpToChunk(idx)}
-                       className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-colors ${
-                         isActive 
-                           ? 'bg-blue-600/10 text-blue-400' 
-                           : 'hover:bg-white/5 text-zinc-400 hover:text-zinc-200'
-                       }`}
-                     >
-                       <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center">
-                         {isPast ? (
-                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500/50" />
-                         ) : isActive ? (
-                           <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]" />
-                         ) : (
-                           <div className="w-1 h-1 rounded-full bg-zinc-700" />
-                         )}
-                       </div>
-                       <div className="flex-1 min-w-0">
-                         <div className={`text-sm font-medium truncate ${isActive ? 'text-blue-300 font-bold' : ''}`}>
-                           {chunk.title}
-                         </div>
-                         <div className="text-[10px] text-zinc-600">
-                           {Math.round(chunk.text.split(' ').length / wpm)} min read
-                         </div>
-                       </div>
-                     </button>
-                   );
-                 })}
-               </div>
+                <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                  {sidebarChunkElements}
+                </div>
              </div>
           )}
         </div>

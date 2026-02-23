@@ -2,25 +2,30 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import TopNav from './TopNav';
-import { BarChart2, TrendingUp, Zap, Clock, Activity, Target, BrainCircuit, Info, X } from 'lucide-react';
-import { getSmarterIndexAction } from '@/app/actions/analytics';
+import { TrendingUp, Clock, Activity, Target, BrainCircuit, Info, X } from 'lucide-react';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer } from 'recharts';
+import { getSmarterIndexAction, getCognitiveProfileAction, generateCognitiveInsightsAction } from '@/app/actions/analytics';
 
 const METRIC_INFO = {
   si: {
     title: "Smarter Index",
-    description: "The Smarter Index is a composite score measuring your overall cognitive growth and learning effectiveness. It weighs your Reading Efficiency (40%), Retention Stability (40%), and Consistency (20%) into a single 0-100 metric. A rising score means you are reading faster, understanding more, and retaining it longer."
+    description: "The Smarter Index is a composite score measuring your overall cognitive growth. It weighs your Processing Speed (30%), Retention Stability (30%), Focus Stability (20%), and Concept Integration (20%)."
   },
-  re: {
-    title: "Reading Efficiency",
-    description: "Reading Efficiency evaluates how fast you read paired with how well you comprehend. It calculates your effective Words Per Minute (WPM) multiplied by your average flashcard accuracy, and penalizes regressions (jumping back to re-read text). A high score reflects smooth, fast, and high-comprehension reading."
+  psi: {
+    title: "Processing Speed Index (PSI)",
+    description: "Processing Speed evaluates how fast you read paired with how well you comprehend, measured in Effective Words Per Minute (EWPM). It normalizes your speed and accuracy into a 0-100 scale."
   },
-  rs: {
-    title: "Retention Stability",
-    description: "Retention Stability measures the strength of your memory over time based on the Spaced Repetition (SM-2) algorithm. It tracks the average interval length between flashcard reviews. A higher score means your brain is successfully committing information to long-term memory, requiring less frequent reviews."
+  rsi: {
+    title: "Retention Stability Index (RSI)",
+    description: "Retention Stability measures the strength of your memory over time based on the Spaced Repetition (SM-2) algorithm. It tracks the average interval length between flashcard reviews and your recall consistency."
   },
-  c: {
-    title: "Consistency",
-    description: "Consistency tracks your learning habits. It measures how many days out of the last 7 you actively read a document or completed your daily flashcard reviews. Regular, consistent learning is key to maintaining a high Smarter Index and building long-term cognitive endurance."
+  fsi: {
+    title: "Focus Stability Index (FSI)",
+    description: "Focus tracks your behavioral endurance. It penalizes frequent regressions (jumping back to re-read text) and high frequencies of micro-pauses, rewarding long, sustained blocks of deep work."
+  },
+  cii: {
+    title: "Concept Integration Index (CII)",
+    description: "Concept Integration tracks how well you connect dots across different documents. It measures your systemic mastery of Concept Clusters over time."
   }
 };
 
@@ -57,9 +62,10 @@ interface SI_Snapshot {
   _id: string;
   date: string;
   siScore: number;
-  reScore: number;
-  rsScore: number;
-  cScore: number;
+  psiScore: number;
+  rsiScore: number;
+  fsiScore: number;
+  ciiScore: number;
 }
 
 interface SI_Data {
@@ -148,59 +154,78 @@ function TrendGraph({ history }: { history: SI_Snapshot[] }) {
   );
 }
 
-// ── Metric Dial Component ────────────────────────────────────────────────
-function MetricDial({ label, score, icon: Icon, colorClass, gradientFrom, gradientTo, onInfoClick }: { label: string, score: number, icon: any, colorClass: string, gradientFrom: string, gradientTo: string, onInfoClick?: () => void }) {
-  const radius = 36;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (score / 100) * circumference;
-
+function AnalyticsSkeleton() {
   return (
-    <div className="flex flex-col items-center p-6 bg-[#0A0D14] rounded-2xl border border-white/[0.05] relative overflow-hidden group">
-      <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${gradientFrom} ${gradientTo} opacity-20`} />
-      
-      <div className="relative mb-4 flex items-center justify-center">
-        <svg className="w-24 h-24 transform -rotate-90">
-          <circle cx="48" cy="48" r={radius} stroke="rgba(255,255,255,0.05)" strokeWidth="6" fill="transparent" />
-          <circle 
-            cx="48" cy="48" r={radius} 
-            stroke="currentColor" 
-            strokeWidth="6" 
-            fill="transparent" 
-            strokeDasharray={circumference} 
-            strokeDashoffset={offset} 
-            className={`${colorClass} transition-all duration-1000 ease-out`}
-            strokeLinecap="round"
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-black text-white">{Math.round(score)}</span>
+    <>
+      {/* Top Widgets Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        
+        {/* Radar Chart */}
+        <div className="lg:col-span-1 bg-[#0A0D14] rounded-2xl border border-white/[0.05] p-6 relative flex flex-col items-center justify-center min-h-[400px]">
+          <div className="w-full aspect-square max-w-[280px] rounded-full bg-white/[0.03] border border-white/[0.05] animate-pulse" />
+        </div>
+
+        {/* Coaching & Metrics */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          {/* Prescriptive Insights Feed */}
+          <div className="bg-[#0A0D14] rounded-2xl border border-white/[0.05] p-6 flex-1 flex flex-col">
+            <div className="h-5 w-40 bg-white/10 rounded animate-pulse mb-6" />
+            <div className="space-y-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 flex gap-3">
+                   <div className="w-5 h-5 rounded bg-indigo-500/20 animate-pulse shrink-0" />
+                   <div className="h-4 w-full bg-indigo-500/20 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Velocity Stats */}
+          <div className="grid grid-cols-2 gap-6">
+            {[1, 2].map(i => (
+              <div key={i} className="bg-[#0A0D14] rounded-2xl border border-white/[0.05] p-5 flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="h-3 w-24 bg-white/10 rounded mb-3 animate-pulse" />
+                  <div className="h-8 w-16 bg-white/20 rounded animate-pulse" />
+                </div>
+                <div className="w-10 h-10 rounded-xl bg-white/[0.03] border border-white/[0.05] animate-pulse" />
+              </div>
+            ))}
+          </div>
+          
         </div>
       </div>
-      
-      <div className="flex items-center gap-1.5 mb-1 z-10">
-        <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
-        <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">{label}</h4>
-        {onInfoClick && (
-          <button onClick={onInfoClick} className="text-zinc-500 hover:text-white transition-colors -ml-0.5" title={`Info about ${label}`}>
-            <Info className="w-3.5 h-3.5" />
-          </button>
-        )}
+
+      {/* Main Growth Graph */}
+      <div className="h-[400px] w-full bg-[#0A0D14] rounded-2xl border border-white/[0.05] mb-20 flex pt-10 px-8">
+         <div className="w-full h-full border-b border-l border-white/10 relative">
+           <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-full h-1/2 bg-gradient-to-t from-blue-500/5 to-transparent animate-pulse" />
+           </div>
+         </div>
       </div>
-    </div>
+    </>
   );
 }
 
 // ── Main Dashboard ───────────────────────────────────────────────────────
+
 export default function AnalyticsPage({ user }: AnalyticsPageProps) {
   const [data, setData] = useState<SI_Data | null>(null);
+  const [profile, setProfile] = useState<{ retentionHalfLifeCurrent?: number; accelerationRate?: string } | null>(null);
+  const [insights, setInsights] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [infoModalKey, setInfoModalKey] = useState<keyof typeof METRIC_INFO | null>(null);
 
   useEffect(() => {
-    getSmarterIndexAction().then(res => {
-      if (res.success) {
-        setData(res);
-      }
+    Promise.all([
+      getSmarterIndexAction(),
+      getCognitiveProfileAction(),
+      generateCognitiveInsightsAction()
+    ]).then(([siRes, profileRes, insightsRes]) => {
+      if (siRes.success) setData(siRes);
+      if (profileRes.success) setProfile(profileRes.profile);
+      if (insightsRes.success) setInsights(insightsRes.insights);
       setLoading(false);
     });
   }, []);
@@ -222,6 +247,19 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
     return `Your Smarter Index dipped ${Math.abs(Math.round(percentChange))}% this week.`;
   }, [data]);
 
+  const { current: currentData, history: historyData } = data || {};
+  const currentSnapshot = useMemo(() => currentData || { siScore: 0, psiScore: 0, rsiScore: 0, fsiScore: 0, ciiScore: 0 }, [currentData]);
+  const history = historyData || [];
+
+  const radarData = useMemo(() => {
+    return [
+      { subject: 'Processing Speed', A: currentSnapshot.psiScore || 0, fullMark: 100, key: 'psi' },
+      { subject: 'Retention Stability', A: currentSnapshot.rsiScore || 0, fullMark: 100, key: 'rsi' },
+      { subject: 'Concept Integration', A: currentSnapshot.ciiScore || 0, fullMark: 100, key: 'cii' },
+      { subject: 'Focus Stability', A: currentSnapshot.fsiScore || 0, fullMark: 100, key: 'fsi' },
+    ];
+  }, [currentSnapshot]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#090C12] text-white flex items-center justify-center">
@@ -229,9 +267,6 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
       </div>
     );
   }
-
-  const currentSnapshot = data?.current || { siScore: 0, reScore: 0, rsScore: 0, cScore: 0 };
-  const history = data?.history || [];
 
   return (
     <div className="min-h-screen bg-[#090C12] text-white font-sans selection:bg-indigo-500/30">
@@ -257,8 +292,8 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
             </div>
             <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
               Smarter Index
-              <span className="text-base font-semibold text-zinc-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg tracking-normal cursor-help" onClick={() => setInfoModalKey('si')} title="Info about Smarter Index">
-                {Math.round(currentSnapshot.siScore)}
+              <span className="text-base font-semibold text-zinc-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg tracking-normal cursor-help flex items-center" onClick={() => setInfoModalKey('si')} title="Info about Smarter Index">
+                {loading ? <div className="w-6 h-5 bg-white/10 animate-pulse rounded" /> : Math.round(currentSnapshot.siScore)}
               </span>
               <button onClick={() => setInfoModalKey('si')} className="text-zinc-500 hover:text-white transition-colors" title="Info about Smarter Index">
                 <Info className="w-5 h-5" />
@@ -266,44 +301,114 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
             </h1>
             <p className="text-sm font-medium text-zinc-400 mt-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
-              <span className="text-white font-semibold">{weeklyChangeStr}</span>
+              <span className="text-white font-semibold flex items-center">
+                {loading ? <div className="w-64 h-4 bg-white/10 animate-pulse rounded" /> : weeklyChangeStr}
+              </span>
             </p>
           </div>
         </div>
 
-        {/* Core Sub-Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <MetricDial 
-            label="Reading Efficiency" 
-            score={currentSnapshot.reScore} 
-            icon={Zap} 
-            colorClass="text-amber-400" 
-            gradientFrom="from-amber-500" 
-            gradientTo="to-orange-500" 
-            onInfoClick={() => setInfoModalKey('re')}
-          />
-          <MetricDial 
-            label="Retention Stability" 
-            score={currentSnapshot.rsScore} 
-            icon={Target} 
-            colorClass="text-emerald-400" 
-            gradientFrom="from-emerald-500" 
-            gradientTo="to-teal-500" 
-            onInfoClick={() => setInfoModalKey('rs')}
-          />
-          <MetricDial 
-            label="Consistency" 
-            score={currentSnapshot.cScore} 
-            icon={Clock} 
-            colorClass="text-blue-400" 
-            gradientFrom="from-blue-500" 
-            gradientTo="to-sky-500" 
-            onInfoClick={() => setInfoModalKey('c')}
-          />
-        </div>
+        {loading ? <AnalyticsSkeleton /> : (
+          <>
+            {/* Top Widgets Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              
+              {/* Radar Chart */}
+              <div className="lg:col-span-1 bg-[#0A0D14] rounded-2xl border border-white/[0.05] p-6 relative flex flex-col items-center">
+                <h3 className="text-sm font-bold text-zinc-200 w-full text-left mb-2 flex items-center justify-between">
+                  Cognitive Profile Radar
+                </h3>
+                <div className="w-full aspect-square max-w-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                      <PolarGrid stroke="rgba(255,255,255,0.1)" />
+                      <PolarAngleAxis 
+                        dataKey="subject" 
+                        tick={{ fill: '#a1a1aa', fontSize: 11, fontWeight: 600 }} 
+                      />
+                      <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                      <Radar name="Cognitive Profile" dataKey="A" stroke="#818cf8" fill="#818cf8" fillOpacity={0.4} />
+                    </RadarChart>
+                  </ResponsiveContainer>
+                </div>
+                
+                <div className="flex gap-4 mt-2 justify-center w-full">
+                  {radarData.map((rd) => (
+                    <button 
+                      key={rd.key}
+                      onClick={() => setInfoModalKey(rd.key as keyof typeof METRIC_INFO)}
+                      className="px-2 py-1 rounded bg-white/[0.03] hover:bg-white/[0.08] text-xs font-medium text-zinc-400 border border-white/5 transition-colors"
+                    >
+                      {Math.round(rd.A)} {rd.key.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-        {/* Main Growth Graph */}
-        <TrendGraph history={history} />
+              {/* Coaching & Metrics */}
+              <div className="lg:col-span-2 flex flex-col gap-6">
+                
+                {/* Prescriptive Insights Feed */}
+                <div className="bg-[#0A0D14] rounded-2xl border border-white/[0.05] p-6 flex-1 flex flex-col">
+                  <h3 className="text-sm font-bold text-zinc-200 mb-4 flex items-center gap-2">
+                    <BrainCircuit className="w-4 h-4 text-indigo-400" />
+                    Adaptive Coaching
+                  </h3>
+                  <div className="flex flex-col gap-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                    {insights.length > 0 ? insights.map((insight, idx) => (
+                      <div key={idx} className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 text-sm text-indigo-100 font-medium leading-relaxed flex items-start gap-3">
+                        <div className="mt-0.5 bg-indigo-500/20 p-1.5 rounded-lg shrink-0">
+                          <Target className="w-3.5 h-3.5 text-indigo-300" />
+                        </div>
+                        {insight}
+                      </div>
+                    )) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-zinc-500 text-sm">
+                        Gathering data to formulate coaching insights...
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Velocity Stats */}
+                {profile && (
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="bg-[#0A0D14] rounded-2xl border border-white/[0.05] p-5 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold tracking-wider text-zinc-500 uppercase mb-1">Memory Half-Life</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-black text-white">{profile.retentionHalfLifeCurrent}</span>
+                          <span className="text-sm text-zinc-400 font-medium">Days</span>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.05]">
+                        <Clock className="w-5 h-5 text-emerald-400" />
+                      </div>
+                    </div>
+                    
+                    <div className="bg-[#0A0D14] rounded-2xl border border-white/[0.05] p-5 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold tracking-wider text-zinc-500 uppercase mb-1">Growth Trajectory</p>
+                        <div className="flex items-baseline gap-2">
+                          <span className={`text-xl font-bold ${profile.accelerationRate === 'Accelerating' ? 'text-indigo-400' : profile.accelerationRate === 'Declining' ? 'text-red-400' : 'text-zinc-200'}`}>
+                            {profile.accelerationRate}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="p-3 bg-white/[0.02] rounded-xl border border-white/[0.05]">
+                        <Activity className={`w-5 h-5 ${profile.accelerationRate === 'Accelerating' ? 'text-indigo-400' : 'text-zinc-400'}`} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+              </div>
+            </div>
+
+            {/* Main Growth Graph */}
+            <TrendGraph history={history} />
+          </>
+        )}
 
       </main>
     </div>
