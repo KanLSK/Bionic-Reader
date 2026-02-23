@@ -2,8 +2,52 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import TopNav from './TopNav';
-import { BarChart2, TrendingUp, Zap, Clock, Activity, Target, BrainCircuit } from 'lucide-react';
+import { BarChart2, TrendingUp, Zap, Clock, Activity, Target, BrainCircuit, Info, X } from 'lucide-react';
 import { getSmarterIndexAction } from '@/app/actions/analytics';
+
+const METRIC_INFO = {
+  si: {
+    title: "Smarter Index",
+    description: "The Smarter Index is a composite score measuring your overall cognitive growth and learning effectiveness. It weighs your Reading Efficiency (40%), Retention Stability (40%), and Consistency (20%) into a single 0-100 metric. A rising score means you are reading faster, understanding more, and retaining it longer."
+  },
+  re: {
+    title: "Reading Efficiency",
+    description: "Reading Efficiency evaluates how fast you read paired with how well you comprehend. It calculates your effective Words Per Minute (WPM) multiplied by your average flashcard accuracy, and penalizes regressions (jumping back to re-read text). A high score reflects smooth, fast, and high-comprehension reading."
+  },
+  rs: {
+    title: "Retention Stability",
+    description: "Retention Stability measures the strength of your memory over time based on the Spaced Repetition (SM-2) algorithm. It tracks the average interval length between flashcard reviews. A higher score means your brain is successfully committing information to long-term memory, requiring less frequent reviews."
+  },
+  c: {
+    title: "Consistency",
+    description: "Consistency tracks your learning habits. It measures how many days out of the last 7 you actively read a document or completed your daily flashcard reviews. Regular, consistent learning is key to maintaining a high Smarter Index and building long-term cognitive endurance."
+  }
+};
+
+// ── Info Modal Component ────────────────────────────────────────────────
+function InfoModal({ title, description, onClose }: { title: string, description: string, onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-[#0F1318] border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl">
+        <div className="p-5">
+          <div className="flex items-start justify-between mb-3">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Info className="w-5 h-5 text-indigo-400" />
+              {title}
+            </h3>
+            <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-sm text-zinc-400 leading-relaxed font-medium">
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface AnalyticsPageProps {
   user: { firstName: string | null };
@@ -105,7 +149,7 @@ function TrendGraph({ history }: { history: SI_Snapshot[] }) {
 }
 
 // ── Metric Dial Component ────────────────────────────────────────────────
-function MetricDial({ label, score, icon: Icon, colorClass, gradientFrom, gradientTo }: { label: string, score: number, icon: any, colorClass: string, gradientFrom: string, gradientTo: string }) {
+function MetricDial({ label, score, icon: Icon, colorClass, gradientFrom, gradientTo, onInfoClick }: { label: string, score: number, icon: any, colorClass: string, gradientFrom: string, gradientTo: string, onInfoClick?: () => void }) {
   const radius = 36;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
@@ -133,9 +177,14 @@ function MetricDial({ label, score, icon: Icon, colorClass, gradientFrom, gradie
         </div>
       </div>
       
-      <div className="flex items-center gap-1.5 mb-1">
+      <div className="flex items-center gap-1.5 mb-1 z-10">
         <Icon className={`w-3.5 h-3.5 ${colorClass}`} />
         <h4 className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">{label}</h4>
+        {onInfoClick && (
+          <button onClick={onInfoClick} className="text-zinc-500 hover:text-white transition-colors -ml-0.5" title={`Info about ${label}`}>
+            <Info className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -145,6 +194,7 @@ function MetricDial({ label, score, icon: Icon, colorClass, gradientFrom, gradie
 export default function AnalyticsPage({ user }: AnalyticsPageProps) {
   const [data, setData] = useState<SI_Data | null>(null);
   const [loading, setLoading] = useState(true);
+  const [infoModalKey, setInfoModalKey] = useState<keyof typeof METRIC_INFO | null>(null);
 
   useEffect(() => {
     getSmarterIndexAction().then(res => {
@@ -185,6 +235,13 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
 
   return (
     <div className="min-h-screen bg-[#090C12] text-white font-sans selection:bg-indigo-500/30">
+      {infoModalKey && (
+        <InfoModal 
+          title={METRIC_INFO[infoModalKey].title} 
+          description={METRIC_INFO[infoModalKey].description} 
+          onClose={() => setInfoModalKey(null)} 
+        />
+      )}
       <TopNav activePage="Analytics" user={user} />
 
       <main className="max-w-6xl mx-auto px-6 py-10">
@@ -198,11 +255,14 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
                 Cognitive Performance
               </p>
             </div>
-            <h1 className="text-3xl font-black text-white tracking-tight flex items-baseline gap-3">
+            <h1 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
               Smarter Index
-              <span className="text-base font-semibold text-zinc-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg tracking-normal">
+              <span className="text-base font-semibold text-zinc-500 bg-white/5 border border-white/10 px-2 py-0.5 rounded-lg tracking-normal cursor-help" onClick={() => setInfoModalKey('si')} title="Info about Smarter Index">
                 {Math.round(currentSnapshot.siScore)}
               </span>
+              <button onClick={() => setInfoModalKey('si')} className="text-zinc-500 hover:text-white transition-colors" title="Info about Smarter Index">
+                <Info className="w-5 h-5" />
+              </button>
             </h1>
             <p className="text-sm font-medium text-zinc-400 mt-2 flex items-center gap-2">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
@@ -220,6 +280,7 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
             colorClass="text-amber-400" 
             gradientFrom="from-amber-500" 
             gradientTo="to-orange-500" 
+            onInfoClick={() => setInfoModalKey('re')}
           />
           <MetricDial 
             label="Retention Stability" 
@@ -228,6 +289,7 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
             colorClass="text-emerald-400" 
             gradientFrom="from-emerald-500" 
             gradientTo="to-teal-500" 
+            onInfoClick={() => setInfoModalKey('rs')}
           />
           <MetricDial 
             label="Consistency" 
@@ -236,6 +298,7 @@ export default function AnalyticsPage({ user }: AnalyticsPageProps) {
             colorClass="text-blue-400" 
             gradientFrom="from-blue-500" 
             gradientTo="to-sky-500" 
+            onInfoClick={() => setInfoModalKey('c')}
           />
         </div>
 

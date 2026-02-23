@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { updateDocumentMetadataAction } from '@/app/actions/library';
 import { getUserProjectsAction } from '@/app/actions/projects';
+import { DashboardStats } from '@/app/actions/analytics';
 import TopNav from './TopNav';
 import UploadModal from './UploadModal';
 
@@ -33,14 +34,10 @@ interface Doc {
 interface ProDashboardProps {
   user: { firstName: string | null };
   documents: Doc[];
+  stats: DashboardStats | null;
 }
 
 // ── Mock analytics data (will be replaced by real Phase 3 data) ──────────────
-const WPM_TREND = [210, 235, 228, 260, 255, 275, 290, 270, 300, 295, 310, 305, 320, 315, 330];
-const CALENDAR_DAYS = Array.from({ length: 28 }, (_, i) => ({
-  day: i + 1,
-  active: [1, 2, 4, 5, 7, 8, 9, 12, 14, 15, 16, 19, 21, 22, 23, 26, 27, 28].includes(i + 1),
-}));
 const CHECKPOINTS = [15, 30, 45, 60, 75, 90];
 
 function getGreeting() {
@@ -108,7 +105,7 @@ function Ring({ pct, size = 72, stroke = 7, color = '#3b82f6' }: { pct: number; 
   );
 }
 
-export default function ProDashboard({ user, documents }: ProDashboardProps) {
+export default function ProDashboard({ user, documents, stats }: ProDashboardProps) {
   const router  = useRouter();
   const [uploadFileQueue, setUploadFileQueue] = useState<File | null>(null);
   const [progress, setProgress]   = useState(0);
@@ -223,16 +220,22 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
                 {getGreeting()}, {user.firstName ?? 'Scholar'}
               </p>
               <p className="text-xl sm:text-2xl font-extrabold tracking-tight text-white leading-tight">
-                You&apos;re reading <span className="text-blue-400">23% faster</span> than last week.
+                {stats && stats.wpmDeltaPercent > 0 ? (
+                  <>You&apos;re reading <span className="text-blue-400">{stats.wpmDeltaPercent}% faster</span> than last week.</>
+                ) : stats && stats.wpmDeltaPercent < 0 ? (
+                  <>Your speed is <span className="text-indigo-400">{Math.abs(stats.wpmDeltaPercent)}% lower</span> than last week.</>
+                ) : (
+                  <>Ready for another <span className="text-blue-400">reading session</span>?</>
+                )}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             {[
-              { icon: Zap,   v: '318 WPM', l: 'Avg Speed', up: true  },
-              { icon: Clock, v: '2.4 hrs',  l: 'This Week', up: true  },
-              { icon: Flame, v: '6 days',   l: 'Streak',    up: false },
+              { icon: Zap,   v: `${stats?.wpmAvg || 250} WPM`, l: 'Avg Speed', up: (stats?.wpmDeltaPercent || 0) >= 0  },
+              { icon: Clock, v: `${stats?.thisWeekHrs || '0.0'} hrs`,  l: 'This Week', up: true  },
+              { icon: Flame, v: `${stats?.streak || 0} days`,   l: 'Streak',    up: false },
             ].map(({ icon: Icon, v, l, up }) => (
               <div key={l} className="flex-1 min-w-[100px] sm:flex-none flex items-center gap-2.5 bg-white/[0.04] border border-white/[0.07] rounded-xl px-4 py-2.5 backdrop-blur-sm">
                 <Icon className="w-4 h-4 text-blue-400 flex-shrink-0" />
@@ -378,9 +381,9 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
 
             <div className="grid grid-cols-3 gap-3 mb-5">
               {[
-                { label: 'Avg WPM',    value: '318',   delta: '+23%', col: 'text-blue-400'   },
-                { label: 'Time Saved', value: '4.2 hr', delta: 'vs avg reader', col: 'text-emerald-400' },
-                { label: 'Sessions',   value: '14',    delta: 'this month', col: 'text-violet-400'  },
+                { label: 'Avg WPM',    value: `${stats?.wpmAvg || 250}`,   delta: (stats?.wpmDeltaPercent || 0) > 0 ? `+${stats?.wpmDeltaPercent}%` : `${stats?.wpmDeltaPercent || 0}%`, col: 'text-blue-400'   },
+                { label: 'Time Saved', value: `${stats?.timeSavedHrs || '0.0'} hr`, delta: 'vs avg reader', col: 'text-emerald-400' },
+                { label: 'Sessions',   value: `${stats?.sessionsThisMonth || 0}`,    delta: 'this month', col: 'text-violet-400'  },
               ].map(({ label, value, delta, col }) => (
                 <div key={label} className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3.5">
                   <p className="text-[10px] text-zinc-600 uppercase tracking-wider mb-1">{label}</p>
@@ -396,10 +399,10 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
                 <span className="text-[10px] text-zinc-600 uppercase tracking-wider">WPM over 15 sessions</span>
                 <div className="flex items-center gap-1 text-emerald-400">
                   <TrendingUp className="w-3 h-3" />
-                  <span className="text-[10px] font-bold">+57% since start</span>
+                  <span className="text-[10px] font-bold">{(stats?.wpmDeltaStartPercent || 0) > 0 ? `+${stats?.wpmDeltaStartPercent}` : stats?.wpmDeltaStartPercent}% since start</span>
                 </div>
               </div>
-              <Sparkline data={WPM_TREND} color="#3b82f6" />
+              {stats?.wpmTrend && <Sparkline data={stats.wpmTrend} color="#3b82f6" />}
             </div>
           </div>
 
@@ -441,20 +444,20 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
             </div>
 
             <div className="flex items-center gap-4 mb-4">
-              <Ring pct={61} size={76} stroke={7} color="#10b981" />
+              <Ring pct={stats?.weeklyFocusPct || 0} size={76} stroke={7} color="#10b981" />
               <div>
-                <p className="text-2xl font-extrabold text-white">61%</p>
+                <p className="text-2xl font-extrabold text-white">{stats?.weeklyFocusPct || 0}%</p>
                 <p className="text-xs text-zinc-500">of weekly goal</p>
-                <p className="text-[11px] text-emerald-400 font-semibold mt-1">37 min left today</p>
+                <p className="text-[11px] text-emerald-400 font-semibold mt-1">{stats?.weeklyFocusLeftMins || 0} min left this week</p>
               </div>
             </div>
 
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-zinc-500">
-                <span>Weekly target</span><span className="text-zinc-300">3h 20m / 5h</span>
+                <span>Weekly target</span><span className="text-zinc-300">{stats?.thisWeekHrs || '0.0'}h / 5h</span>
               </div>
               <div className="h-1 bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full w-[61%] rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.4)]" style={{ width: `${stats?.weeklyFocusPct || 0}%` }} />
               </div>
             </div>
 
@@ -475,13 +478,13 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
 
             {/* Accuracy ring */}
             <div className="flex items-center gap-4 mb-4">
-              <Ring pct={78} size={72} stroke={6} color="#3b82f6" />
+              <Ring pct={stats?.accuracyRate || 0} size={72} stroke={6} color="#3b82f6" />
               <div className="flex-1">
-                <p className="text-2xl font-extrabold text-white">78%</p>
+                <p className="text-2xl font-extrabold text-white">{stats?.accuracyRate || 0}%</p>
                 <p className="text-xs text-zinc-500 mb-1">Accuracy rate</p>
                 <div className="flex items-center gap-1">
                   <div className="h-1.5 flex-1 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full w-[78%] bg-blue-500 rounded-full shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
+                    <div className="h-full bg-blue-500 rounded-full shadow-[0_0_6px_rgba(59,130,246,0.5)]" style={{ width: `${stats?.accuracyRate || 0}%` }} />
                   </div>
                   <span className="text-[10px] text-zinc-600">Mastery</span>
                 </div>
@@ -490,8 +493,8 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
 
             <div className="grid grid-cols-2 gap-2 mb-4">
               {[
-                { icon: CheckCircle2, v: '142', l: 'Cards mastered', c: 'text-emerald-400' },
-                { icon: RotateCcw,    v: '18',  l: 'Due for review',  c: 'text-amber-400'  },
+                { icon: CheckCircle2, v: `${stats?.cardsMastered || 0}`, l: 'Cards mastered', c: 'text-emerald-400' },
+                { icon: RotateCcw,    v: `${stats?.dueForReview || 0}`,  l: 'Due for review',  c: 'text-amber-400'  },
               ].map(({ icon: Icon, v, l, c }) => (
                 <div key={l} className="bg-white/[0.03] border border-white/[0.05] rounded-xl p-3 flex items-start gap-2">
                   <Icon className={`w-3.5 h-3.5 ${c} mt-0.5 flex-shrink-0`} />
@@ -516,7 +519,7 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
                 <h3 className="text-sm font-bold text-white">Reading Streak</h3>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xl font-extrabold text-orange-400">6</span>
+                <span className="text-xl font-extrabold text-orange-400">{stats?.streak || 0}</span>
                 <span className="text-xs text-zinc-600">days</span>
               </div>
             </div>
@@ -529,9 +532,9 @@ export default function ProDashboard({ user, documents }: ProDashboardProps) {
                 ))}
               </div>
               <div className="grid grid-cols-7 gap-1">
-                {CALENDAR_DAYS.map(({ day, active }) => (
+                {(stats?.calendarDays || Array.from({ length: 28 }, (_, i) => ({ day: i + 1, active: false }))).map(({ day, active }, index) => (
                   <div
-                    key={day}
+                    key={index}
                     className={`aspect-square rounded-md flex items-center justify-center text-[10px] font-semibold transition-colors ${
                       active
                         ? 'bg-orange-500/20 border border-orange-500/30 text-orange-300'
