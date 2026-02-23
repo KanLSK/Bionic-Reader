@@ -11,6 +11,7 @@ import {
   Play, Pause, RotateCcw, Plus, Minus, Clock, CheckCircle2
 } from 'lucide-react';
 import { updateDocumentProgressAction } from '@/app/actions/library';
+import { logReadingSessionAction } from '@/app/actions/analytics';
 import { chunkText, type TextChunk } from '@/lib/chunking';
 
 const BionicPdfViewer = dynamic(() => import('./OriginalPdfViewer'), {
@@ -66,6 +67,11 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const idleTimer   = useRef<NodeJS.Timeout | null>(null);
 
+  // Analytics tracking
+  const sessionStartTime = useRef<number>(Date.now());
+  const sessionRegressions = useRef<number>(0);
+  const highestWordIndex = useRef<number>(initialWordIndex);
+
   const progress       = maxWords > 0 ? (currentWordIndex / maxWords) * 100 : 0;
   const wordsRemaining = maxWords - currentWordIndex;
   const minsRemaining  = Math.max(0, Math.round(wordsRemaining / wpm));
@@ -106,6 +112,24 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
     return () => clearTimeout(timer);
   }, [currentWordIndex, documentId]);
+
+  // ── Analytics Session Flush ──────────────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      // Upon unmount, log the session IF we read anything
+      const durationMs = Date.now() - sessionStartTime.current;
+      const wordsRead = Math.max(0, highestWordIndex.current - initialWordIndex);
+      if (documentId && durationMs > 5000 && wordsRead > 10) {
+        logReadingSessionAction({
+          documentId,
+          durationMs,
+          wordsRead,
+          wpm,
+          regressions: sessionRegressions.current
+        }).catch(console.error);
+      }
+    };
+  }, [documentId, initialWordIndex, wpm]);
 
   // ── Checkpoint trigger ────────────────────────────────────────────────────
   const triggerCheckpoint = useCallback(async (checkpoint: number) => {
@@ -182,6 +206,12 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
     setCurrentWordIndex((prev) => {
       if (prev >= maxWords - 1) { setIsPlaying(false); return prev; }
       const next     = prev + 1;
+      
+      // Update highest word index for analytics
+      if (next > highestWordIndex.current) {
+        highestWordIndex.current = next;
+      }
+
       const progress = (next / maxWords) * 100;
       for (const cp of CHECKPOINTS) {
         if (progress >= cp && !triggeredCheckpoints.current.has(cp)) {
@@ -215,8 +245,12 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
   const handleWordClick = useCallback((localIdx: number) => {
     setIsPlaying(false);
-    setCurrentWordIndex(currentChunk.startIndex + localIdx);
-  }, [currentChunk]);
+    const newIdx = currentChunk.startIndex + localIdx;
+    if (newIdx < currentWordIndex) {
+      sessionRegressions.current += 1; // Log regression!
+    }
+    setCurrentWordIndex(newIdx);
+  }, [currentChunk, currentWordIndex]);
 
   const handleModalClose = () => {
     setModalOpen(false);
@@ -225,7 +259,11 @@ export default function ReaderContainer({ documentId, rawText, documentTitle = '
 
   const jumpToChunk = (chunkIndex: number) => {
     setIsPlaying(false);
-    setCurrentWordIndex(chunks[chunkIndex].startIndex);
+    const newIdx = chunks[chunkIndex].startIndex;
+    if (newIdx < currentWordIndex) {
+      sessionRegressions.current += 1; // Log regression!
+    }
+    setCurrentWordIndex(newIdx);
     if (window.innerWidth < 1024) setSidebarOpen(false); // Close on mobile
   };
 

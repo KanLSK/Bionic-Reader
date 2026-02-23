@@ -149,6 +149,14 @@ export async function recordFlashcardResponseAction(
     }
   );
 
+  // Hook into analytics pipeline
+  try {
+    const { logReviewSessionAction } = await import('@/app/actions/analytics');
+    await logReviewSessionAction(1, isCorrect ? 1 : 0);
+  } catch (err) {
+    console.error("Failed to log review session", err);
+  }
+
   return { success: true };
 }
 
